@@ -8,3 +8,5 @@ build.ninja
 .ninja_log
 
 .mxproject
+
+/.vscode/settings.json
