@@ -1,3 +1,3 @@
 # Software prototype
 
-This is an early software version meant for prototyping and testing, created for the Nucleo-F303RE.
+This is an early version of the software, intended for prototyping and testing on the Nucleo-F303RE.
