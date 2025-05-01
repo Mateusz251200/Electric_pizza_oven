@@ -15,8 +15,8 @@
   *
   ******************************************************************************
   */
-/* USER CODE END Header */
-/* Includes ------------------------------------------------------------------*/
+  /* USER CODE END Header */
+  /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -94,11 +94,15 @@ int main(void) {
     MX_I2C1_Init();
     /* USER CODE BEGIN 2 */
 
+    LCDinit(&hi2c1, 0x27);
+
     /* USER CODE END 2 */
 
     /* Infinite loop */
     /* USER CODE BEGIN WHILE */
     while (1) {
+        HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
+        HAL_Delay(250);
         /* USER CODE END WHILE */
 
         /* USER CODE BEGIN 3 */
