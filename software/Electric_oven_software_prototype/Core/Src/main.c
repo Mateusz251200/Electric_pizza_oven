@@ -94,7 +94,7 @@ int main(void) {
     MX_I2C1_Init();
     /* USER CODE BEGIN 2 */
 
-    LCDinit(&hi2c1, 0x27);
+    lcdInit(&hi2c1, 0x27);
 
     /* USER CODE END 2 */
 
