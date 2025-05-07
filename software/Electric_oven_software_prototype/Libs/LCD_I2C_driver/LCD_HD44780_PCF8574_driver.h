@@ -4,8 +4,9 @@
 #include "stm32f3xx_hal.h"
 #include "stdint.h"
 
+// TODO: add settings
 /**
- * @brief Initialise LCD with 4-bit mode (TO DO: add settings)
+ * @brief Initialise LCD with 4-bit mode
  * @param hi2cHandle pointer to HAL's I2C handle struct
  * @param lcdAddress LCD's I2C address (will be shifted internally)
  */

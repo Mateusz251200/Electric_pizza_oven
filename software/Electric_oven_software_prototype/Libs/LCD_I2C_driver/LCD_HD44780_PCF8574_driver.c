@@ -1,11 +1,15 @@
 #include "LCD_HD44780_PCF8574_driver.h"
 
-// hardware interface control bits
+/* HARDWARE ABSTRACTION */
 
-#define RS_BIT  (uint8_t)0x01
-#define RW_BIT  (uint8_t)0x02
-#define EN_BIT  (uint8_t)0x04
-#define BL_BIT  (uint8_t)0x08 // backlight
+// interface control bits
+
+#define RS_DATA_REG                 (uint8_t)0x01
+#define RS_INSTR_REG                (uint8_t)0
+#define EN_HIGH                     (uint8_t)0x04
+#define EN_LOW                      (uint8_t)0
+#define BL_ON                       (uint8_t)0x08   // backlight
+#define BL_OFF                      (uint8_t)0
 
 // instructions and arguments bits
 
@@ -14,78 +18,32 @@
 #define RETURN_HOME_INSTR           (uint8_t)0x02
 
 #define ENTRY_MODE_SET_INSTR_BIT    (uint8_t)0x04
-#define EMS_ENTRY_DIR_BIT           (uint8_t)0x02
-#define EMS_DISP_SHIFT_BIT          (uint8_t)0x01
+#define EMS_ENTRY_TO_LEFT           (uint8_t)0x02
+#define EMS_ENTRY_TO_RIGHT          (uint8_t)0
+#define EMS_DISP_SHIFT_ON           (uint8_t)0x01
+#define EMS_DISP_SHIFT_OFF          (uint8_t)0
 
 #define DISPLAY_CONTROL_INSTR_BIT   (uint8_t)0x08
-#define DC_DISP_ON_BIT              (uint8_t)0x04
-#define DC_CURSOR_ON_BIT            (uint8_t)0x02
-#define DC_BLINK_ON_BIT             (uint8_t)0x01
+#define DC_DISP_ON                  (uint8_t)0x04
+#define DC_DISP_OFF                 (uint8_t)0
+#define DC_CURSOR_ON                (uint8_t)0x02
+#define DC_CURSOR_OFF               (uint8_t)0
+#define DC_BLINK_ON                 (uint8_t)0x01
+#define DC_BLINK_OFF                (uint8_t)0
 
 #define CURS_DISP_SHIFT_INSTR_BIT   (uint8_t)0x10
-#define CDS_SELECT_BIT              (uint8_t)0x08
-#define CDS_DIRECTION_BIT           (uint8_t)0x04
+#define CDS_SHIFT_DISPLAY           (uint8_t)0x08
+#define CDS_SHIFT_CURSOR            (uint8_t)0
+#define CDS_SHIFT_RIGHT             (uint8_t)0x04
+#define CDS_SHIFT_LEFT              (uint8_t)0
 
 #define FUNCTION_SET_INSTR_BIT      (uint8_t)0x20
-#define FS_DATA_LENGTH_BIT          (uint8_t)0x10
-#define FS_LINES_NUM_BIT            (uint8_t)0x08
-#define FS_FONT_SIZE_BIT            (uint8_t)0x04
-
-// enums for setting bits in instructions
-
-typedef enum RegisterSelect_e {
-    RS_instr = 0,       // instruction register
-    RS_data = RS_BIT    // data register
-} RegisterSelect_e;
-
-typedef enum BacklightState_e {
-    BL_off = 0,
-    BL_on = BL_BIT
-} BacklightState_e;
-
-
-typedef enum EMS_entryDir_e {
-    EMS_rightToLeft = 0,
-    EMS_leftToRight = EMS_ENTRY_DIR_BIT
-} EMS_entryDir_e;
-
-typedef enum EMS_dispShift_e {
-    EMS_shiftOff = 0,
-    EMS_shiftOn = EMS_DISP_SHIFT_BIT
-} EMS_dispShift_e;
-
-
-typedef enum DC_dispState_e {
-    DC_dispOff = 0,
-    DC_dispOn = DC_DISP_ON_BIT
-} DC_dispState_e;
-
-typedef enum DC_cursorVisibility_e {
-    DC_cursorOff = 0,
-    DC_cursorOn = DC_CURSOR_ON_BIT
-} DC_cursorVisibility_e;
-
-typedef enum DC_cursorBlink_e {
-    DC_blinkOff = 0,
-    DC_blinkOn = DC_BLINK_ON_BIT
-} DC_cursorBlink_e;
-
-
-typedef enum FS_dataLength_e {
-    FS_4bitMode = 0,
-    FS_8bitMode = FS_DATA_LENGTH_BIT
-} FS_dataLength_e;
-
-typedef enum FS_linesNum_e {
-    FS_1line = 0,
-    FS_2lines = FS_LINES_NUM_BIT
-} FS_linesNum_e;
-
-typedef enum FS_fontSize_e {
-    FS_5x8dots = 0,
-    FS_5x10dots = FS_FONT_SIZE_BIT
-} FS_fontSize_e;
-
+#define FS_8BIT_MODE                (uint8_t)0x10
+#define FS_4BIT_MODE                (uint8_t)0
+#define FS_2LINE_DISP               (uint8_t)0x08
+#define FS_1LINE_DISP               (uint8_t)0
+#define FS_5X10_DOTS                (uint8_t)0x04
+#define FS_5x8_DOTS                 (uint8_t)0
 
 // I2C parameters
 
@@ -94,15 +52,15 @@ uint8_t address;
 
 // default settings
 
-BacklightState_e        bl = BL_on;
-EMS_entryDir_e          EMS_entryDir = EMS_leftToRight;
-EMS_dispShift_e         EMS_dispShift = EMS_shiftOff;
-DC_dispState_e          DC_dispState = DC_dispOn;
-DC_cursorVisibility_e   DC_cursorVis = DC_cursorOn;
-DC_cursorBlink_e        DC_cursorBlink = DC_blinkOff;
-const FS_dataLength_e   FS_dataLength = FS_4bitMode;
-FS_linesNum_e           FS_linesNum = FS_2lines;
-FS_fontSize_e           FS_fontSize = FS_5x8dots;
+uint8_t bl = BL_ON;
+uint8_t EMS_entryDir = EMS_ENTRY_TO_RIGHT;
+uint8_t EMS_dispShift = EMS_DISP_SHIFT_ON;
+uint8_t DC_dispState = DC_DISP_ON;
+uint8_t DC_cursorVisblty = DC_CURSOR_ON;
+uint8_t DC_cursorBlink = DC_BLINK_OFF;
+const uint8_t FS_dataLength = FS_4BIT_MODE;
+uint8_t FS_linesNum = FS_2LINE_DISP;
+uint8_t FS_fontSize = FS_5x8_DOTS;
 
 // instructions to be built from individual bits using the above enum-type variables
 
@@ -111,16 +69,16 @@ uint8_t DC_instr;
 uint8_t FS_instr;
 
 
-void LCDsendByte(RegisterSelect_e rs, uint8_t data) {
-    uint8_t buffer[6] = { 0 };
+void lcdSendByte(uint8_t rs, uint8_t data) {
+    static uint8_t buffer[6] = { 0 };
 
     // upper half
-    buffer[0] = (data & 0xf0) | rs | bl;
-    buffer[1] = buffer[0] | EN_BIT;
+    buffer[0] = (data & 0xf0) | EN_LOW | rs | bl;
+    buffer[1] = buffer[0] | EN_HIGH;
     buffer[2] = buffer[0];
     // lower half
-    buffer[3] = (data << 4) | rs | bl;
-    buffer[4] = buffer[3] | EN_BIT;
+    buffer[3] = (data << 4) | EN_LOW | rs | bl;
+    buffer[4] = buffer[3] | EN_HIGH;
     buffer[5] = buffer[3];
 
     HAL_I2C_Master_Transmit(hi2c, address, buffer, 6, HAL_MAX_DELAY);
@@ -145,8 +103,8 @@ void lcdInit(I2C_HandleTypeDef* i2cHandle, uint8_t lcdAddress) {
     */
 
     uint8_t buffer[3] = { 0 };
-    buffer[0] = INIT_8BIT_MODE | bl;
-    buffer[1] = buffer[0] | EN_BIT;
+    buffer[0] = INIT_8BIT_MODE | EN_LOW | bl;
+    buffer[1] = buffer[0] | EN_HIGH;
     buffer[2] = buffer[0];
 
     for (uint8_t i = 0; i < 3; i++) {
@@ -154,20 +112,20 @@ void lcdInit(I2C_HandleTypeDef* i2cHandle, uint8_t lcdAddress) {
         HAL_Delay(5);
     }
 
-    buffer[0] = INIT_4BIT_MODE | bl;
-    buffer[1] = buffer[0] | EN_BIT;
+    buffer[0] = INIT_4BIT_MODE | EN_LOW | bl;
+    buffer[1] = buffer[0] | EN_HIGH;
     buffer[2] = buffer[0];
 
     HAL_I2C_Master_Transmit(hi2c, address, buffer, 3, HAL_MAX_DELAY);
 
     // build instructions from individual bits
-    
+
     EMS_instr = ENTRY_MODE_SET_INSTR_BIT | EMS_entryDir | EMS_dispShift;
-    DC_instr = DISPLAY_CONTROL_INSTR_BIT | DC_dispState | DC_cursorVis | DC_cursorBlink;
+    DC_instr = DISPLAY_CONTROL_INSTR_BIT | DC_dispState | DC_cursorVisblty | DC_cursorBlink;
     FS_instr = FUNCTION_SET_INSTR_BIT | FS_dataLength | FS_linesNum | FS_fontSize;
 
-    LCDsendByte(RS_instr, FS_instr);
-    LCDsendByte(RS_instr, EMS_instr);
-    LCDsendByte(RS_instr, DC_instr);
-    LCDsendByte(RS_instr, CLEAR_DISPLAY_INSTR);
+    lcdSendByte(RS_INSTR_REG, FS_instr);
+    lcdSendByte(RS_INSTR_REG, EMS_instr);
+    lcdSendByte(RS_INSTR_REG, DC_instr);
+    lcdSendByte(RS_INSTR_REG, CLEAR_DISPLAY_INSTR);
 }
