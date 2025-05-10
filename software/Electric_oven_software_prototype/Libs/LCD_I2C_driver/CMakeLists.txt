@@ -1,5 +1,5 @@
 add_library(LCD_I2C_driver STATIC
-    LCD_HD44780_PCF8574_driver.c
+    lcd_hd44780_pcf8574_driver.c
 )
 
 # resolve HAL dependency

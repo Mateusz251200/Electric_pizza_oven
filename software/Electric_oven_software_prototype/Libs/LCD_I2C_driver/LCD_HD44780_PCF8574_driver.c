@@ -1,4 +1,13 @@
-#include "LCD_HD44780_PCF8574_driver.h"
+/**
+ * @file lcd_hd44780_pcf8574_driver.c
+ * @brief HD44780 LCD driver implementation for STM32 using PCF8574 I2C I/O expander module.
+ *
+ * This file implements a non-blocking, DMA-based driver for character LCDs using the HD44780 controller and PCF8574 I/O expander module. The driver uses a circular queue to buffer characters and instructions. The DMA and I2C interface is handled using the STM's HAL.
+ *
+ * See lcd_hd44780_pcf8574_driver.h for API details.
+ */
+
+#include "lcd_hd44780_pcf8574_driver.h"
 
 /* HARDWARE ABSTRACTION */
 
@@ -39,10 +48,16 @@
 #define FUNCTION_SET_INSTR_BIT      (uint8_t)0x20
 #define FS_8BIT_MODE                (uint8_t)0x10
 #define FS_4BIT_MODE                (uint8_t)0
-#define FS_2LINE_DISP               (uint8_t)0x08
-#define FS_1LINE_DISP               (uint8_t)0
-#define FS_5X10_DOTS                (uint8_t)0x04
+#define FS_2LINE_MAP                (uint8_t)0x08
+#define FS_1LINE_MAP                (uint8_t)0
+#define FS_5x10_DOTS                (uint8_t)0x04
 #define FS_5x8_DOTS                 (uint8_t)0
+
+#define SET_DDRAM_ADDR_INSTR_BIT    (uint8_t)0x80
+#define DDRAM_ADDR_R0C0             (uint8_t)0
+#define DDRAM_ADDR_R1C0             (uint8_t)0x40
+#define DDRAM_ADDR_R2C0             (uint8_t)0x14
+#define DDRAM_ADDR_R3C0             (uint8_t)0x54
 
 // default settings
 
@@ -50,17 +65,17 @@ uint8_t bl = BL_ON;
 uint8_t EMS_entryDir = EMS_ENTRY_TO_RIGHT;
 uint8_t EMS_dispShift = EMS_DISP_SHIFT_OFF;
 uint8_t DC_dispState = DC_DISP_ON;
-uint8_t DC_cursorVisblty = DC_CURSOR_ON;
-uint8_t DC_cursorBlink = DC_BLINK_ON;
+uint8_t DC_cursorVisblty = DC_CURSOR_OFF;
+uint8_t DC_cursorBlink = DC_BLINK_OFF;
 const uint8_t FS_dataLength = FS_4BIT_MODE;
-uint8_t FS_linesNum = FS_2LINE_DISP;
+uint8_t FS_numOfLines = FS_2LINE_MAP;
 uint8_t FS_fontSize = FS_5x8_DOTS;
 
 // full instructions for entry mode set, display control, and function set
 
 #define EMS_INSTR   ENTRY_MODE_SET_INSTR_BIT | EMS_entryDir | EMS_dispShift
 #define DC_INSTR    DISPLAY_CONTROL_INSTR_BIT | DC_dispState | DC_cursorVisblty | DC_cursorBlink
-#define FS_INSTR    FUNCTION_SET_INSTR_BIT | FS_dataLength | FS_linesNum | FS_fontSize
+#define FS_INSTR    FUNCTION_SET_INSTR_BIT | FS_dataLength | FS_numOfLines | FS_fontSize
 
 /* I2C info */
 
@@ -153,37 +168,55 @@ void sendOldestQueueEntry(void) {
     sendByte(entry.rs, entry.data);
 }
 
+void enqueueAndSendOldestEntry(QueueEntry* entry) {
+    enqueue(entry);
+    if (!txInProgress) {
+        txInProgress = true;
+        sendOldestQueueEntry();
+    }
+}
+
 void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef* hi2c) {
     if (hi2c == lcdhi2c) {
         sendOldestQueueEntry();
     }
 }
 
-/* API */
+/* API - printing characters and strings */
 
 void lcdPrintChar(uint8_t c) {
     QueueEntry entry = { RS_DATA_REG, c };
-    enqueue(&entry);
-    if (!txInProgress) {
-        txInProgress = true;
-        sendOldestQueueEntry();
-    }
+    enqueueAndSendOldestEntry(&entry);
 }
 
-void lcdAutoScroll(bool state) {
+void lcdPrintStr(char* str) {
+    while (*str)
+        lcdPrintChar(*str++);
+}
+
+/* API - settings and actions */
+
+// backlight
+
+void lcdBacklightOn(bool state) {
     if (state)
-        EMS_dispShift = EMS_DISP_SHIFT_ON;
+        bl = BL_ON;
     else
-        EMS_dispShift = EMS_DISP_SHIFT_OFF;
-    QueueEntry entry = { RS_INSTR_REG, EMS_INSTR };
-    enqueue(&entry);
-    if (!txInProgress) {
-        txInProgress = true;
-        sendOldestQueueEntry();
-    }
+        bl = BL_OFF;
 }
 
-void lcdClearDisplay() {
+void lcdBacklightOnImmediate(bool state) {
+    if (state)
+        bl = BL_ON;
+    else
+        bl = BL_OFF;
+    QueueEntry entry = { RS_INSTR_REG, 0 };
+    enqueueAndSendOldestEntry(&entry);
+}
+
+// clear display, return home
+
+void lcdClear(void) {
     QueueEntry entry = { RS_INSTR_REG, CLEAR_DISPLAY_INSTR };
     enqueue(&entry);
 
@@ -193,22 +226,143 @@ void lcdClearDisplay() {
         enqueue(&entry);
     }
 
-    if (!txInProgress) {
-        txInProgress = true;
-        sendOldestQueueEntry();
-    }
+    enqueueAndSendOldestEntry(&entry);
 }
 
-// TODO: add the remaining functionality
+void lcdReturnHome(void) {
+    QueueEntry entry = { RS_INSTR_REG, RETURN_HOME_INSTR };
+    enqueue(&entry);
+
+    // dummy entries to simulate delay (amount might require tweaking)
+    entry.data = 0;
+    for (uint8_t i = 0; i < 3; i++) {
+        enqueue(&entry);
+    }
+
+    enqueueAndSendOldestEntry(&entry);
+}
+
+// entry mode set
+
+void lcdPrintLeftToRight(void) {
+    EMS_entryDir = EMS_ENTRY_TO_RIGHT;
+    QueueEntry entry = { RS_INSTR_REG, EMS_INSTR };
+    enqueueAndSendOldestEntry(&entry);
+}
+
+void lcdPrintRightToLeft(void) {
+    EMS_entryDir = EMS_ENTRY_TO_LEFT;
+    QueueEntry entry = { RS_INSTR_REG, EMS_INSTR };
+    enqueueAndSendOldestEntry(&entry);
+}
+
+void lcdAutoScroll(bool state) {
+    if (state)
+        EMS_dispShift = EMS_DISP_SHIFT_ON;
+    else
+        EMS_dispShift = EMS_DISP_SHIFT_OFF;
+    QueueEntry entry = { RS_INSTR_REG, EMS_INSTR };
+    enqueueAndSendOldestEntry(&entry);
+}
+
+// display control
+
+void lcdDisplayOn(bool state) {
+    if (state)
+        DC_dispState = DC_DISP_ON;
+    else
+        DC_dispState = DC_DISP_OFF;
+    QueueEntry entry = { RS_INSTR_REG, DC_INSTR };
+    enqueueAndSendOldestEntry(&entry);
+}
+
+void lcdCursorVisible(bool state) {
+    if (state)
+        DC_cursorVisblty = DC_CURSOR_ON;
+    else
+        DC_cursorVisblty = DC_CURSOR_OFF;
+    QueueEntry entry = { RS_INSTR_REG, DC_INSTR };
+    enqueueAndSendOldestEntry(&entry);
+}
+
+void lcdCursorBlink(bool state) {
+    if (state)
+        DC_cursorBlink = DC_BLINK_ON;
+    else
+        DC_cursorBlink = DC_BLINK_OFF;
+    QueueEntry entry = { RS_INSTR_REG, DC_INSTR };
+    enqueueAndSendOldestEntry(&entry);
+}
+
+// cursor/display shift
+
+void lcdShiftCursorRight(void) {
+    QueueEntry entry = { RS_INSTR_REG, CURS_DISP_SHIFT_INSTR_BIT | CDS_SHIFT_CURSOR | CDS_SHIFT_RIGHT };
+    enqueueAndSendOldestEntry(&entry);
+}
+
+void lcdShiftCursorLeft(void) {
+    QueueEntry entry = { RS_INSTR_REG, CURS_DISP_SHIFT_INSTR_BIT | CDS_SHIFT_CURSOR | CDS_SHIFT_LEFT };
+    enqueueAndSendOldestEntry(&entry);
+}
+
+void lcdShiftDisplayRight(void) {
+    QueueEntry entry = { RS_INSTR_REG, CURS_DISP_SHIFT_INSTR_BIT | CDS_SHIFT_DISPLAY | CDS_SHIFT_RIGHT };
+    enqueueAndSendOldestEntry(&entry);
+}
+
+void lcdShiftDisplayLeft(void) {
+    QueueEntry entry = { RS_INSTR_REG, CURS_DISP_SHIFT_INSTR_BIT | CDS_SHIFT_DISPLAY | CDS_SHIFT_LEFT };
+    enqueueAndSendOldestEntry(&entry);
+}
+
+// set DDRAM address (cursor position)
+
+void lcdSetCursorPosition(uint8_t row, uint8_t col) {
+    QueueEntry entry;
+    entry.rs = RS_INSTR_REG;
+    switch (row) {
+        case 0:
+            entry.data = (SET_DDRAM_ADDR_INSTR_BIT | DDRAM_ADDR_R0C0) + col;
+            break;
+        case 1:
+            entry.data = (SET_DDRAM_ADDR_INSTR_BIT | DDRAM_ADDR_R1C0) + col;
+            break;
+        case 2:
+            entry.data = (SET_DDRAM_ADDR_INSTR_BIT | DDRAM_ADDR_R2C0) + col;
+            break;
+        case 3:
+            entry.data = (SET_DDRAM_ADDR_INSTR_BIT | DDRAM_ADDR_R3C0) + col;
+            break;
+        default:
+            break;
+    }
+    enqueueAndSendOldestEntry(&entry);
+}
 
 /* LCD INITIALISATION */
 
 #define INIT_8BIT_MODE 0x30
 #define INIT_4BIT_MODE 0x20
 
-void lcdInit(I2C_HandleTypeDef* hi2c, uint8_t address) {
+void lcdInit(I2C_HandleTypeDef* hi2c, uint8_t address, uint8_t numOfLines, uint8_t cellHeight, bool backlight) {
     lcdhi2c = hi2c;
     lcdAddress = address << 1;
+
+    if (numOfLines > 1)
+        FS_numOfLines = FS_2LINE_MAP;
+    else
+        FS_numOfLines = FS_1LINE_MAP;
+
+    if (cellHeight == 10)
+        FS_fontSize = FS_5x10_DOTS;
+    else
+        FS_fontSize = FS_5x8_DOTS;
+
+    if (backlight)
+        bl = BL_ON;
+    else
+        bl = BL_OFF;
 
     /*
     initialisation sequence:
@@ -246,5 +400,5 @@ void lcdInit(I2C_HandleTypeDef* hi2c, uint8_t address) {
     txInProgress = true;
     sendOldestQueueEntry();
 
-    lcdClearDisplay();
+    lcdClear();
 }
