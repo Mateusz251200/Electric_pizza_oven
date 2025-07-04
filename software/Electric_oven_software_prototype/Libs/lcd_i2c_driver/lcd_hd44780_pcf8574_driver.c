@@ -1,6 +1,8 @@
 /**
  * @file lcd_hd44780_pcf8574_driver.c
  * @brief HD44780 LCD driver implementation for STM32 using PCF8574 I2C I/O expander module.
+ * @author Mateusz Stelmaszyński
+ * @copyright Copyright (c) 2025 Mateusz Stelmaszyński. Licensed under the MIT License. See the LICENSE file in the \software\ directory of this repository for full terms.
  *
  * This file implements a non-blocking, DMA-based driver for character LCDs using the HD44780 controller and PCF8574 I/O expander module. The driver uses a circular queue to buffer characters and instructions. The DMA and I2C interface is handled using the STM's HAL.
  *

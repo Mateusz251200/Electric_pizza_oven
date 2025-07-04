@@ -14,6 +14,7 @@
   * If no LICENSE file comes with this software, it is provided AS-IS.
   *
   ******************************************************************************
+  * @note Portions of this file written inside USER CODE BEGIN/END blocks are authored by Mateusz Stelmaszyński (c) 2025 and are licensed under the MIT License. See the LICENSE file in the \software\ directory of this repository for full terms.
   */
   /* USER CODE END Header */
   /* Includes ------------------------------------------------------------------*/

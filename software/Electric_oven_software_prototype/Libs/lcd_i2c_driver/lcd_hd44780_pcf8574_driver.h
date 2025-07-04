@@ -1,6 +1,8 @@
 /**
  * @file lcd_hd44780_pcf8574_driver.c
  * @brief Public API for HD44780 LCD driver for STM32, using PCF8574 I2C I/O expander module.
+ * @author Mateusz Stelmaszyński
+ * @copyright Copyright (c) 2025 Mateusz Stelmaszyński. Licensed under the MIT License. See the LICENSE file in the \software\ directory of this repository for full terms.
  *
  * # Key Features
  * - Asynchronous, DMA-based data transmission (no hardware delays and blocking transmissions, except for the lcdInit function)
