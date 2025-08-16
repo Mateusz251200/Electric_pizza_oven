@@ -19,7 +19,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # Set the project name
-set(CMAKE_PROJECT_NAME Electric_oven_software_prototype)
+set(CMAKE_PROJECT_NAME Oven_controller_firmware_prototype)
 
 # Include toolchain file
 include("cmake/gcc-arm-none-eabi.cmake")
