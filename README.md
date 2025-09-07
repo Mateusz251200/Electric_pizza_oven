@@ -15,7 +15,7 @@
   - single temperature setpoint with coupled heaters (one control loop)
   - single setpoint with variable power ratio between heaters (one control loop)
   - independent top and bottom temperature control (two control loops)
-  - hysteresis (on/off) control (one control loop)
+  - hysteresis control (one control loop)
   - manual (open-loop) control
 - User interface including an LCD (HD44780) with an interactive menu
 - Overheating protection
@@ -25,7 +25,7 @@
 ## Progress list
 
 - 🔄 Control panel
-  - ✅🔧 HD44780 LCD driver (I2C+DMA)
+  - ✅ HD44780 LCD driver (I2C+DMA)
   - 🔄 Interactive menu
 - ⏳ Temperature measurement circuit
 - ⏳ PID algorithm
