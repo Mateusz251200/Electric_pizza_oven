@@ -14,7 +14,7 @@
   * If no LICENSE file comes with this software, it is provided AS-IS.
   *
   ******************************************************************************
-  * @note Portions of this file written inside USER CODE BEGIN/END blocks are authored by Mateusz Stelmaszyński (c) 2025 and are licensed under the MIT License. See the LICENSE file in the \software\ directory of this repository for full terms.
+  * @note Portions of this file written inside USER CODE BEGIN/END blocks are authored by Mateusz Stelmaszyński (c) 2025 and are licensed under the MIT License. See the LICENSE file in the root directory of this repository for details.
   */
   /* USER CODE END Header */
   /* Includes ------------------------------------------------------------------*/
@@ -95,12 +95,15 @@ int main(void) {
     /* USER CODE BEGIN 2 */
 
     lcdInit(&hi2c1, 0x27, 2, 8, true);
+    uint8_t c = '!';
 
     /* USER CODE END 2 */
 
     /* Infinite loop */
     /* USER CODE BEGIN WHILE */
     while (1) {
+        lcdPrintChar(c++);
+        
         HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
         HAL_Delay(250);
         /* USER CODE END WHILE */
@@ -158,7 +161,15 @@ void SystemClock_Config(void) {
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef* hi2c) {
+    if (hi2c == &hi2c1)
+        lcdFlushQueue();
+}
 
+void HAL_I2C_ErrorCallback(I2C_HandleTypeDef* hi2c) {
+    if (hi2c == &hi2c1)
+        lcdi2cErrorHandler();
+}
 /* USER CODE END 4 */
 
 /**
@@ -167,7 +178,7 @@ void SystemClock_Config(void) {
   */
 void Error_Handler(void) {
     /* USER CODE BEGIN Error_Handler_Debug */
-          /* User can add his own implementation to report the HAL error return state */
+              /* User can add his own implementation to report the HAL error return state */
     __disable_irq();
     while (1) {
     }
@@ -184,8 +195,8 @@ void Error_Handler(void) {
   */
 void assert_failed(uint8_t* file, uint32_t line) {
     /* USER CODE BEGIN 6 */
-          /* User can add his own implementation to report the file name and line number,
-             ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-             /* USER CODE END 6 */
+              /* User can add his own implementation to report the file name and line number,
+                 ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+                 /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
