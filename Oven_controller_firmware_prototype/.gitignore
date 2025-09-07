@@ -6,7 +6,6 @@ cmake_install.cmake
 build.ninja
 .ninja_deps
 .ninja_log
-
-.mxproject
+compile_commands.json
 
 /.vscode/settings.json
