@@ -22,8 +22,8 @@
 // instructions and arguments bits
 
 #define CLEAR_DISPLAY_INSTR         (uint8_t)0x01
-
 #define RETURN_HOME_INSTR           (uint8_t)0x02
+#define NOP                         (uint8_t)0      // not an actual hardware instruction, just used for marking dummy queue entries
 
 #define ENTRY_MODE_SET_INSTR_BIT    (uint8_t)0x04
 #define EMS_ENTRY_RTL               (uint8_t)0x02
@@ -165,14 +165,22 @@ volatile LCDStatus_t lcdStatus = LCD_OK;
 
 LCDStatus_t txByte(uint8_t rs, uint8_t data) {
     static uint8_t buffer[6] = { 0 };
-    // upper half
-    buffer[0] = (data & 0xf0) | rs | bl;
-    buffer[1] = buffer[0] | EN_BIT;
-    buffer[2] = buffer[0];
-    // lower half
-    buffer[3] = (data << 4) | rs | bl;
-    buffer[4] = buffer[3] | EN_BIT;
-    buffer[5] = buffer[3];
+
+    if (rs == RS_INSTR_REG && data == NOP) { // dummy entries from lcdClear() and lcdReturnHome()
+        buffer[0] = data | rs | bl;
+        for (uint8_t i = 1; i < sizeof(buffer); i++) {
+            buffer[i] = buffer[0];
+        }
+    } else {
+        // upper half
+        buffer[0] = (data & 0xf0) | rs | bl;
+        buffer[1] = buffer[0] | EN_BIT;
+        buffer[2] = buffer[0];
+        // lower half
+        buffer[3] = (data << 4) | rs | bl;
+        buffer[4] = buffer[3] | EN_BIT;
+        buffer[5] = buffer[3];
+    }
 
     if (HAL_I2C_GetError(lcdhi2c) != HAL_I2C_ERROR_NONE) {  // if an error persists over 2 transmissions, pause the queue
         if (i2cErrorPending) {
@@ -184,7 +192,7 @@ LCDStatus_t txByte(uint8_t rs, uint8_t data) {
     } else
         i2cErrorPending = false;
 
-    if (HAL_I2C_Master_Transmit_DMA(lcdhi2c, lcdAddress, buffer, 6) != HAL_OK) {
+    if (HAL_I2C_Master_Transmit_DMA(lcdhi2c, lcdAddress, buffer, sizeof(buffer)) != HAL_OK) {
         return LCD_I2C_TX_INIT_FAIL;
     }
     return LCD_OK;
@@ -301,12 +309,10 @@ LCDStatus_t lcdClear(void) {
     QueueEntry_t e = { RS_INSTR_REG, CLEAR_DISPLAY_INSTR };
     LCDStatus_t status = enq(&e);
     if (status != LCD_OK) return status;
-    // dummy entries to simulate a delay on the I2C bus (amount might require tweaking)
-    e.data = 0;
-    for (uint8_t i = 0; i < 3; i++) {
-        status = enq(&e);
-        if (status != LCD_OK) return status;
-    }
+    // two dummy entries to simulate a delay on the I2C bus (amount might require tweaking)
+    e.data = NOP;
+    status = enq(&e);
+    if (status != LCD_OK) return status;
     return enqAndBeginFlushing(&e);
 }
 
@@ -314,12 +320,10 @@ LCDStatus_t lcdReturnHome(void) {
     QueueEntry_t e = { RS_INSTR_REG, RETURN_HOME_INSTR };
     LCDStatus_t status = enq(&e);
     if (status != LCD_OK) return status;
-    // dummy entries to simulate a delay on the I2C bus (amount might require tweaking)
-    e.data = 0;
-    for (uint8_t i = 0; i < 3; i++) {
-        status = enq(&e);
-        if (status != LCD_OK) return status;
-    }
+    // two dummy entries to simulate a delay on the I2C bus (amount might require tweaking)
+    e.data = NOP;
+    status = enq(&e);
+    if (status != LCD_OK) return status;
     return enqAndBeginFlushing(&e);
 }
 

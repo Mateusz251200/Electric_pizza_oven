@@ -93,7 +93,7 @@ LCDStatus_t lcdClear(void);
 
 /**
  * @brief Moves the cursor to the starting position
- * @note Simulates a delay on the I2C bus by sending dummy bytes
+ * @note Simulates a delay on the I2C bus by sending dummy bytes. If you only care about moving the cursor to row 0 and column 0, consider using lcdSetCursorPos(0, 0) - it's faster (doesn't require dummy bytes).
  */
 LCDStatus_t lcdReturnHome(void);
 
